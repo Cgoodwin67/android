@@ -62,7 +62,7 @@ namespace Xamarin.Android.Tasks
 		public bool EnablePreloadAssembliesDefault { get; set; }
 
 		// This property should be required but it will require modifying `monodroid` first
-		//[Required]
+		[Required]
 		public string AndroidBinUtilsDirectory { get; set; }
 
 		public bool EnableMarshalMethods { get; set; }
