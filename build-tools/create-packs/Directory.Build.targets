@@ -173,6 +173,7 @@
 
     <ItemGroup>
       <ItemsToPush Include="$(OutputPath)*.nupkg" />
+      <ItemsToPush Include="$(OutputPath)*.zip" />
     </ItemGroup>
 
     <Error Condition="'@(ItemsToPush)' == ''" Text="No packages to push." />
