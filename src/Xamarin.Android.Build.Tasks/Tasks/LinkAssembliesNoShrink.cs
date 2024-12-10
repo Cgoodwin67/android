@@ -24,6 +24,7 @@ namespace Xamarin.Android.Tasks
 			public FixAbstractMethodsStep? fixAbstractMethodsStep = null;
 			public AddKeepAlivesStep? addKeepAliveStep = null;
 			public FixLegacyResourceDesignerStep? fixLegacyResourceDesignerStep = null;
+			public GenerateJavaStubs? generateJavaStubs = null;
 		}
 
 		public override string TaskPrefix => "LNS";
@@ -56,6 +57,9 @@ namespace Xamarin.Android.Tasks
 		/// Defaults to false, enables Mono.Cecil to load symbols
 		/// </summary>
 		public bool ReadSymbols { get; set; }
+
+		[Required]
+		public string ApplicationJavaClass { get; set; } = "";
 
 		public override bool RunTask ()
 		{
@@ -103,6 +107,9 @@ namespace Xamarin.Android.Tasks
 					runState.fixAbstractMethodsStep = new FixAbstractMethodsStep (runState.resolver, runState.cache, Log);
 					runState.addKeepAliveStep = new AddKeepAlivesStep (runState.resolver, runState.cache, Log);
 					runState.fixLegacyResourceDesignerStep = new FixLegacyResourceDesignerStep (runState.resolver, runState.cache, Log);
+					runState.generateJavaStubs = new GenerateJavaStubs (runState.cache, Log) {
+						ApplicationJavaClass = ApplicationJavaClass,
+					};
 				}
 
 				DoRunTask (source, destination, runState, writerParameters);
@@ -141,9 +148,10 @@ namespace Xamarin.Android.Tasks
 
 				bool save = runState.fixAbstractMethodsStep.FixAbstractMethods (assemblyDefinition);
 				if (UseDesignerAssembly)
-				save |= runState.fixLegacyResourceDesignerStep!.ProcessAssemblyDesigner (assemblyDefinition);
+					save |= runState.fixLegacyResourceDesignerStep!.ProcessAssemblyDesigner (assemblyDefinition);
 				if (AddKeepAlives)
-				save |= runState.addKeepAliveStep!.AddKeepAlives (assemblyDefinition);
+					save |= runState.addKeepAliveStep!.AddKeepAlives (assemblyDefinition);
+				runState.generateJavaStubs?.ProcessAssembly (assemblyDefinition);
 				if (save) {
 					Log.LogDebugMessage ($"Saving modified assembly: {destination.ItemSpec}");
 					Directory.CreateDirectory (Path.GetDirectoryName (destination.ItemSpec));
@@ -235,6 +243,26 @@ namespace Xamarin.Android.Tasks
 			{
 				return resolver.GetAssembly ("System.Private.CoreLib.dll");
 			}
+
+			public override void LogMessage (string message)
+			{
+				logger.LogDebugMessage ("{0}", message);
+			}
+		}
+
+		class GenerateJavaStubs : Microsoft.Android.Sdk.ILLink.GenerateJavaStubs
+		{
+			readonly TaskLoggingHelper logger;
+
+			public GenerateJavaStubs (TypeDefinitionCache cache, TaskLoggingHelper logger)
+				: base (cache)
+			{
+				this.logger = logger;
+			}
+
+			// base.ProcessAssembly() is protected
+			public new void ProcessAssembly (AssemblyDefinition assembly) =>
+				base.ProcessAssembly (assembly);
 
 			public override void LogMessage (string message)
 			{

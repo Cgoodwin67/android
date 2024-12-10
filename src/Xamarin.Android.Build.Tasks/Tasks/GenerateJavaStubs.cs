@@ -80,6 +80,7 @@ namespace Xamarin.Android.Tasks
 
 		public string PackageNamingPolicy { get; set; }
 
+		[Required]
 		public string ApplicationJavaClass { get; set; }
 
 		public bool SkipJniAddNativeMethodRegistrationAttributeScan { get; set; }
@@ -383,9 +384,9 @@ namespace Xamarin.Android.Tasks
 			bool success;
 
 			if (generateJavaCode) {
-				success = jcwGenerator.GenerateAndClassify (AndroidSdkPlatform, outputPath: Path.Combine (OutputDirectory, "src"), ApplicationJavaClass);
+				success = jcwGenerator.GenerateAndClassify ();
 			} else {
-				success = jcwGenerator.Classify (AndroidSdkPlatform);
+				success = jcwGenerator.Classify ();
 			}
 
 			if (!success) {

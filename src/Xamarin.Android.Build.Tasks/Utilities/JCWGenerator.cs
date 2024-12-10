@@ -58,168 +58,26 @@ class JCWGenerator
 	/// classifier instance on return.  If marshal methods are disabled, this call is a no-op but it will
 	/// return <c>true</c>.
 	/// </summary>
-	public bool Classify (string androidSdkPlatform)
+	public bool Classify ()
 	{
 		if (!context.UseMarshalMethods) {
 			return true;
 		}
 
 		Classifier = MakeClassifier ();
-		return ProcessTypes (
-			generateCode: false,
-			androidSdkPlatform,
-			Classifier,
-			outputPath: null,
-			applicationJavaClass: null
-		);
+		return true;
 	}
 
-	public bool GenerateAndClassify (string androidSdkPlatform, string outputPath, string applicationJavaClass)
+	public bool GenerateAndClassify ()
 	{
 		if (context.UseMarshalMethods) {
 			Classifier = MakeClassifier ();
 		}
 
-		return ProcessTypes (
-			generateCode: true,
-			androidSdkPlatform,
-			Classifier,
-			outputPath,
-			applicationJavaClass
-		);
+		return true;
 	}
 
 	MarshalMethodsClassifier MakeClassifier () => new MarshalMethodsClassifier (context.Arch, context.TypeDefinitionCache, context.Resolver, log);
-
-	bool ProcessTypes (bool generateCode, string androidSdkPlatform, MarshalMethodsClassifier? classifier, string? outputPath, string? applicationJavaClass)
-	{
-		if (generateCode && String.IsNullOrEmpty (outputPath)) {
-			throw new ArgumentException ("must not be null or empty", nameof (outputPath));
-		}
-
-		string monoInit = GetMonoInitSource (androidSdkPlatform);
-		bool hasExportReference = context.ResolvedAssemblies.Any (assembly => Path.GetFileName (assembly.ItemSpec) == "Mono.Android.Export.dll");
-		bool ok = true;
-
-		foreach (TypeDefinition type in context.JavaTypes) {
-			if (type.IsInterface) {
-				// Interfaces are in typemap but they shouldn't have JCW generated for them
-				continue;
-			}
-
-			CallableWrapperType generator = CreateGenerator (type, classifier, monoInit, hasExportReference, applicationJavaClass);
-			if (!generateCode) {
-				continue;
-			}
-
-			if (!GenerateCode (generator, type, outputPath, hasExportReference, classifier)) {
-				ok = false;
-			}
-		}
-
-		return ok;
-	}
-
-	bool GenerateCode (CallableWrapperType generator, TypeDefinition type, string outputPath, bool hasExportReference, MarshalMethodsClassifier? classifier)
-	{
-		bool ok = true;
-		using var writer = MemoryStreamPool.Shared.CreateStreamWriter ();
-		var writer_options = new CallableWrapperWriterOptions {
-			CodeGenerationTarget    = JavaPeerStyle.XAJavaInterop1
-		};
-
-		try {
-			generator.Generate (writer, writer_options);
-			if (context.UseMarshalMethods) {
-				if (classifier.FoundDynamicallyRegisteredMethods (type)) {
-					log.LogWarning ($"Type '{type.GetAssemblyQualifiedName (context.TypeDefinitionCache)}' will register some of its Java override methods dynamically. This may adversely affect runtime performance. See preceding warnings for names of dynamically registered methods.");
-				}
-			}
-			writer.Flush ();
-
-			string path = generator.GetDestinationPath (outputPath);
-			Files.CopyIfStreamChanged (writer.BaseStream, path);
-			if (generator.HasExport && !hasExportReference) {
-				Diagnostic.Error (4210, Properties.Resources.XA4210);
-			}
-		} catch (XamarinAndroidException xae) {
-			ok = false;
-			log.LogError (
-				subcategory: "",
-				errorCode: "XA" + xae.Code,
-				helpKeyword: string.Empty,
-				file: xae.SourceFile,
-				lineNumber: xae.SourceLine,
-				columnNumber: 0,
-				endLineNumber: 0,
-				endColumnNumber: 0,
-				message: xae.MessageWithoutCode,
-				messageArgs: Array.Empty<object> ()
-			);
-		} catch (DirectoryNotFoundException ex) {
-			ok = false;
-			if (OS.IsWindows) {
-				Diagnostic.Error (5301, Properties.Resources.XA5301, type.FullName, ex);
-			} else {
-				Diagnostic.Error (4209, Properties.Resources.XA4209, type.FullName, ex);
-			}
-		} catch (Exception ex) {
-			ok = false;
-			Diagnostic.Error (4209, Properties.Resources.XA4209, type.FullName, ex);
-		}
-
-		return ok;
-	}
-
-	CallableWrapperType CreateGenerator (TypeDefinition type, MarshalMethodsClassifier? classifier, string monoInit, bool hasExportReference, string? applicationJavaClass)
-	{
-		var reader_options = new CallableWrapperReaderOptions {
-			DefaultApplicationJavaClass         = applicationJavaClass,
-			DefaultGenerateOnCreateOverrides    = false, // this was used only when targetting Android API <= 10, which is no longer supported
-			DefaultMonoRuntimeInitialization    = monoInit,
-			MethodClassifier                    = classifier,
-		};
-
-		return CecilImporter.CreateType (type, context.TypeDefinitionCache, reader_options);
-	}
-
-	static string GetMonoInitSource (string androidSdkPlatform)
-	{
-		if (String.IsNullOrEmpty (androidSdkPlatform)) {
-			throw new ArgumentException ("must not be null or empty", nameof (androidSdkPlatform));
-		}
-
-		// Lookup the mono init section from MonoRuntimeProvider:
-		// Mono Runtime Initialization {{{
-		// }}}
-		var builder = new StringBuilder ();
-		var runtime = "Bundled";
-		var api = "";
-		if (int.TryParse (androidSdkPlatform, out int apiLevel) && apiLevel < 21) {
-			api = ".20";
-		}
-
-		var assembly = Assembly.GetExecutingAssembly ();
-		using var s = assembly.GetManifestResourceStream ($"MonoRuntimeProvider.{runtime}{api}.java");
-		using var reader = new StreamReader (s);
-		bool copy = false;
-		string? line;
-		while ((line = reader.ReadLine ()) != null) {
-			if (string.CompareOrdinal ("\t\t// Mono Runtime Initialization {{{", line) == 0) {
-				copy = true;
-			}
-
-			if (copy) {
-				builder.AppendLine (line);
-			}
-
-			if (string.CompareOrdinal ("\t\t// }}}", line) == 0) {
-				break;
-			}
-		}
-
-		return builder.ToString ();
-	}
 
 	public static void EnsureAllArchitecturesAreIdentical (TaskLoggingHelper logger, ConcurrentDictionary<AndroidTargetArch, NativeCodeGenState> javaStubStates)
 	{
