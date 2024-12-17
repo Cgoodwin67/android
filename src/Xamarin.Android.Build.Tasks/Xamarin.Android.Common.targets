@@ -2160,6 +2160,7 @@ because xbuild doesn't support framework reference assemblies.
       ApkOutputPath="$(_ApkOutputPath)"
       FilesToAddToArchive="@(FilesToAddToArchive)"
       UncompressedFileExtensions="$(AndroidStoreUncompressedFileExtensions)"
+      UseLibZipSharp="$(_AndroidUseLibZipSharp)"
       ZipFlushFilesLimit="$(_ZipFlushFilesLimit)"
       ZipFlushSizeLimit="$(_ZipFlushSizeLimit)" />
 
@@ -2293,6 +2294,7 @@ because xbuild doesn't support framework reference assemblies.
       ApkOutputPath="$(_ApkOutputPath)"
       FilesToAddToArchive="@(FilesToAddToArchive)"
       UncompressedFileExtensions="$(AndroidStoreUncompressedFileExtensions)"
+      UseLibZipSharp="$(_AndroidUseLibZipSharp)"
       ZipFlushFilesLimit="$(_ZipFlushFilesLimit)"
       ZipFlushSizeLimit="$(_ZipFlushSizeLimit)" />
 
